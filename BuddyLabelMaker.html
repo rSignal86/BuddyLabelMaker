@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BuddyLabelMaker - QSL Sync Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lexend:wght@400;700&family=Roboto+Mono:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+    
+    <style>
+        body { margin:0; font-family: 'Lexend', sans-serif; background:#f0f2f5; color: #333; overflow: hidden; }
+        .wrapper { display:flex; height:100vh; }
+        .sidebar { width:380px; background:#fff; padding:20px; overflow-y:auto; border-right:1px solid #d1d1d1; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
+        .section { margin-bottom:20px; padding-bottom:15px; border-bottom: 1px solid #eee; }
+        .section h3 { margin:0 0 12px 0; color:#2c3e50; font-size: 1.1em; border-left: 4px solid #f39c12; padding-left: 10px; }
+        label { display:block; margin:8px 0 4px; font-weight:bold; font-size: 0.85em; color: #555; }
+        input, select { width:100%; padding:10px; margin-bottom:10px; border: 1px solid #ccc; border-radius:4px; box-sizing:border-box; font-family: inherit; }
+        
+        button { width:100%; padding:12px; margin:5px 0; background:#2980b9; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition: 0.2s; }
+        button:hover { background:#1f6391; }
+        .btn-download { background: #27ae60; font-size: 1.1em; margin-top: 15px; }
+        .btn-help { background: #f1c40f; color: #2c3e50; margin-bottom: 20px; }
+        .btn-picker { background: #ecf0f1; color: #2c3e50; border: 2px dashed #bdc3c7; }
+        .btn-sync { background: #ecf0f1; color: #2c3e50; border: 2px solid #bdc3c7; margin-top: 10px; }
+
+        .main { flex:1; display:flex; flex-direction:column; background: #444; min-width: 0; }
+        .preview-container { flex: 1; display:flex; justify-content:center; align-items:center; padding:20px; overflow: hidden; }
+        canvas { background:#fff; box-shadow: 0 0 20px rgba(0,0,0,0.4); max-width: 95%; max-height: 95%; border: 1px solid #999; cursor: move; }
+        
+        .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.7); }
+        .modal-content { background:white; margin:5% auto; padding:25px; width:70%; max-height:80%; border-radius:8px; overflow-y:auto; }
+        .country-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 20px; }
+        .country-btn { padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.8em; text-align: center; }
+        .country-btn.active { background: #2980b9; color: white; border-color: #1f6391; font-weight: bold; }
+        
+        .table-area { height: 35%; background:#fff; overflow:auto; border-top:3px solid #f39c12; }
+        table { width:100%; border-collapse:collapse; font-size:12px; min-width: 800px; }
+        th { background:#f8f9fa; position: sticky; top: 0; padding: 12px 8px; border-bottom: 2px solid #ddd; text-align: left; }
+        td { padding:8px; border-bottom: 1px solid #eee; font-family: 'Courier Prime', monospace; }
+        .selected-row { background: #fef5d1 !important; font-weight: bold; }
+        .info-text { font-size: 0.75em; color: #7f8c8d; font-style: italic; margin-top: 4px; line-height: 1.3; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 5px; cursor: pointer; }
+        .checkbox-group input { width: auto; margin: 0; }
+    </style>
+</head>
+<body>
+
+<div id="countryModal" class="modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; padding-bottom:10px;">
+            <h2 style="margin:0;">Select Countries</h2>
+            <div>
+                <button onclick="toggleAllCountries(true)" style="width:auto; background:#7f8c8d; padding: 8px 15px;">Select All</button>
+                <button onclick="toggleAllCountries(false)" style="width:auto; background:#7f8c8d; padding: 8px 15px;">Deselect All</button>
+                <button onclick="closePicker()" style="width:auto; background:#2c3e50; padding: 8px 15px;">Apply & Close</button>
+            </div>
+        </div>
+        <div id="countryGrid" class="country-grid"></div>
+    </div>
+</div>
+
+<div class="wrapper">
+    <div class="sidebar">
+        <h2 style="margin:0; color:#f39c12;">🏷️ BuddyLabelMaker</h2>
+        <button class="btn-help" onclick="alert('1. Upload ADIF\n2. Slå eventuelt på QSL-BY-BUREAU Sync for å filtrere/sortere\n3. Table scales with scroll wheel\n4. PDF generates all filtered labels.')">❓ Help</button>
+
+        <div class="section">
+            <h3>1. Label Style & Size</h3>
+            <label>Font Family</label>
+            <select id="fontFamily" onchange="updatePreview()">
+                <option value="'Courier Prime', monospace">Courier Prime (Slashed Zero)</option>
+                <option value="'Roboto Mono', monospace">Roboto Mono</option>
+                <option value="'Lexend', sans-serif">Lexend</option>
+            </select>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div><label>Width (mm)</label><input type="number" id="labelWidth" value="90" oninput="updatePreview()"></div>
+                <div><label>Height (mm)</label><input type="number" id="labelHeight" value="60" oninput="updatePreview()"></div>
+            </div>
+            <div style="margin: 15px 0;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8em; font-weight:bold;"><span>Table Text Level</span><span id="levelVal">5</span></div>
+                <input type="range" id="tableLevel" min="1" max="10" value="5" oninput="updateTableLevel(this.value)" style="width:100%;">
+            </div>
+            <label class="checkbox-group">
+                <input type="checkbox" id="showWatermark" checked onchange="updatePreview()">
+                <span style="font-size:0.85em;">Show Credit Text</span>
+            </label>
+        </div>
+
+        <div class="section">
+            <h3>2. ADIF Data & Filter</h3>
+            <label>Log File (.adi)</label>
+            <input type="file" id="adifFile" accept=".adi,.adif">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div><label>Date From</label><input type="date" id="filterStart" onchange="processLogData()"></div>
+                <div><label>Date To</label><input type="date" id="filterEnd" onchange="processLogData()"></div>
+            </div>
+            <label>Countries</label>
+            <button class="btn-picker" onclick="openPicker()">🌍 Select Countries (<span id="countDisplay">All</span>)</button>
+        </div>
+
+        <div class="section">
+            <h3>3. Q.S.L B.Y B.U.R.E.A.U</h3>
+            <div style="background: #fff8e1; padding: 12px; border-radius: 4px; border: 1px solid #f39c12;">
+                <label class="checkbox-group">
+                    <input type="checkbox" id="autoSort" checked onchange="processLogData()">
+                    <span style="font-size: 0.85em; font-weight:bold;">Standard Sort by ADIF Country</span>
+                </label>
+                
+                <button id="btn-qsl-sync" class="btn-sync">Enable QSL-BY-BUREAU Sync</button>
+                
+                <p style="font-size:0.85em; margin:10px 0 0 0;"><a href="https://github.com/rSignal86/QSL-BY-BUREAU" target="_blank" style="color:#2980b9; font-weight:bold;">👉 github.com/rSignal86/QSL-BY-BUREAU</a></p>
+            </div>
+        </div>
+
+        <button id="generatePDF" class="btn-download">GENERATE PDF</button>
+        <button id="resetLayout" style="background: #7f8c8d; font-size:0.8em;">Reset Layout</button>
+    </div>
+
+    <div class="main">
+        <div class="preview-container"><canvas id="labelCanvas"></canvas></div>
+        <div class="table-area">
+            <table id="qsoTable">
+                <thead>
+                    <tr><th>#</th><th>Date/Time</th><th>Call</th><th id="th-country">Country</th><th>MHz</th><th>Mode</th><th>RST</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+let allQSOs = [];
+let filteredQSOs = [];
+let availableCountries = [];
+let selectedCountries = [];
+let activeQSO = { call: "LA1CALLSIGN", qso_date: "20260412", time_on: "1200", mode: "CW", freq: "14.074", rst_sent: "599", country: "Norway", comment: "TNX!", full_dt: new Date() };
+
+// QSL BY BUREAU Variabler
+let prefixData = null;
+let qslSyncActive = false;
+
+const MM_TO_PX = 10;
+const TABLE_KEYS = ['h_date','h_mhz','h_mode','h_rst','v_date','v_mhz','v_mode','v_rst'];
+
+const DEFAULT_LAYOUT = {
+  confirmText: { x: 5, y: 5, size: 14, bold: false, text: "Confirming QSO With:", isTable: false },
+  callsign: { x: 5, y: 12, size: 38, bold: true, text: "CALL", isTable: false },
+  h_date: { x: 5, y: 30, size: 16, bold: true, text: "Date  Time", isTable: true, baseSize: 16 },
+  h_mhz: { x: 33, y: 30, size: 17, bold: true, text: "MHz", isTable: true, baseSize: 17 },
+  h_mode: { x: 50, y: 30, size: 19, bold: true, text: "MODE", isTable: true, baseSize: 19 },
+  h_rst: { x: 70, y: 30, size: 19, bold: true, text: "RST", isTable: true, baseSize: 19 },
+  v_date: { x: 5, y: 37, size: 10, bold: true, text: "VAL_DATE", isTable: true, baseSize: 10 },
+  v_mhz: { x: 33, y: 37, size: 10, bold: true, text: "VAL_FREQ", isTable: true, baseSize: 10 },
+  v_mode: { x: 50, y: 37, size: 10, bold: true, text: "VAL_MODE", isTable: true, baseSize: 10 },
+  v_rst: { x: 70, y: 37, size: 10, bold: true, text: "VAL_RST", isTable: true, baseSize: 10 },
+  comment: { x: 5, y: 50, size: 10, bold: false, text: "COMMENT", isTable: false },
+  watermark: { x: 5, y: 56, size: 5, bold: false, text: "Made with BuddyLabelMaker - github.com/rSignal86/BuddyLabelMaker ", isTable: false }
+};
+
+let currentLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+const canvas = document.getElementById("labelCanvas");
+const ctx = canvas.getContext("2d");
+
+// ─── QSL BY BUREAU LOGIKK ───────────────────────────────────────────────
+async function loadPrefixData() {
+    if (prefixData) return true;
+    try {
+        const r = await fetch('https://raw.githubusercontent.com/rSignal86/QSL-BY-BUREAU/main/data/prefixList.json?t=' + Date.now());
+        prefixData = await r.json();
+        return true;
+    } catch (e) {
+        console.error("Error: could not load prefixList, check you internet connection", e);
+        return false;
+    }
+}
+
+function extractPrefix(callsign) {
+    if (!prefixData) return '';
+    const clean = callsign.split('/')[0].toUpperCase();
+    const all = Object.values(prefixData.countries || {}).flatMap(c => c.prefixes || []);
+    return all.filter(p => clean.startsWith(p)).sort((a,b)=>b.length-a.length)[0] || '';
+}
+
+function getCountryInfo(prefix) {
+    if (!prefixData || !prefix) return null;
+    for (const [country, info] of Object.entries(prefixData.countries || {})) {
+        if (info.prefixes?.includes(prefix)) return { country, info };
+    }
+    return null;
+}
+
+document.getElementById("btn-qsl-sync").onclick = async function() {
+    const btn = this;
+    if (!qslSyncActive) {
+        btn.innerText = "Laster QSL-data...";
+        const ok = await loadPrefixData();
+        if (ok) {
+            qslSyncActive = true;
+            btn.style.background = "#27ae60";
+            btn.style.color = "white";
+            btn.innerText = "Synced with QSL-BY-BUREAU";
+            document.getElementById("th-country").innerText = "Bureau Country";
+        } else {
+            btn.innerText = "Enable QSL-BY-BUREAU sorting";
+            alert("Could not grab data from GitHub.");
+            return;
+        }
+    } else {
+        qslSyncActive = false;
+        btn.style.background = "#ecf0f1";
+        btn.style.color = "#2c3e50";
+        btn.innerText = "Enable QSL-BY-BUREAU Sorting";
+        document.getElementById("th-country").innerText = "Country";
+    }
+    processLogData(); 
+};
+// ────────────────────────────────────────────────────────────────────────
+
+function openPicker() { document.getElementById("countryModal").style.display = "block"; }
+function closePicker() { document.getElementById("countryModal").style.display = "none"; processLogData(); }
+
+function toggleCountry(el, name) {
+    if (selectedCountries.includes(name)) {
+        selectedCountries = selectedCountries.filter(c => c !== name);
+        el.classList.remove('active');
+    } else {
+        selectedCountries.push(name);
+        el.classList.add('active');
+    }
+}
+
+function toggleAllCountries(select) {
+    selectedCountries = select ? [...availableCountries] : [];
+    document.querySelectorAll('.country-btn').forEach(btn => {
+        select ? btn.classList.add('active') : btn.classList.remove('active');
+    });
+}
+
+function updateTableLevel(val) {
+    document.getElementById("levelVal").innerText = val;
+    const factor = 1 + (val - 5) * 0.1; 
+    TABLE_KEYS.forEach(k => { currentLayout[k].size = currentLayout[k].baseSize * factor; });
+    updatePreview();
+}
+
+function updatePreview() {
+    const mmW = parseFloat(document.getElementById("labelWidth").value) || 90;
+    const mmH = parseFloat(document.getElementById("labelHeight").value) || 60;
+    canvas.width = mmW * MM_TO_PX; canvas.height = mmH * MM_TO_PX;
+    ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "black"; ctx.textBaseline = "top";
+    const font = document.getElementById("fontFamily").value;
+
+    if (!activeQSO || activeQSO.call === "NO DATA") {
+        ctx.font = `20px ${font}`;
+        ctx.fillText("NO VALID QSO DATA", 10, 20);
+        return;
+    }
+
+    Object.keys(currentLayout).forEach(key => {
+        const item = currentLayout[key];
+        if (key === 'watermark' && !document.getElementById("showWatermark").checked) return;
+        let val = item.text;
+        if(key === 'callsign') val = activeQSO.call;
+        if(key === 'v_date') val = `${formatDate(activeQSO.qso_date)} ${activeQSO.time_on}`;
+        if(key === 'v_mhz') val = activeQSO.freq;
+        if(key === 'v_mode') val = activeQSO.mode;
+        if(key === 'v_rst') val = activeQSO.rst_sent;
+        if(key === 'comment') val = activeQSO.comment ? `Comment: ${activeQSO.comment}` : "";
+        if(!val) return;
+        ctx.font = `${item.bold ? 'bold' : ''} ${item.size * 2.5}px ${font}`;
+        ctx.fillText(val, item.x * MM_TO_PX, item.y * MM_TO_PX);
+    });
+}
+
+// DRAG & SCALE LOGIC
+let dragItem = null;
+let dragOffset = { x: 0, y: 0 };
+canvas.onmousedown = e => {
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (canvas.width / r.width) / MM_TO_PX;
+    const my = (e.clientY - r.top) * (canvas.height / r.height) / MM_TO_PX;
+    for (let key of Object.keys(currentLayout).reverse()) {
+        let item = currentLayout[key];
+        if (mx >= item.x && mx <= item.x + 25 && my >= item.y && my <= item.y + 8) { 
+            dragItem = key; dragOffset.x = mx - item.x; dragOffset.y = my - item.y; break; 
+        }
+    }
+};
+window.onmousemove = e => {
+    if (!dragItem) return;
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (canvas.width / r.width) / MM_TO_PX;
+    const my = (e.clientY - r.top) * (canvas.height / r.height) / MM_TO_PX;
+    const dx = Math.round(mx - dragOffset.x) - currentLayout[dragItem].x;
+    const dy = Math.round(my - dragOffset.y) - currentLayout[dragItem].y;
+    if (currentLayout[dragItem].isTable) {
+        TABLE_KEYS.forEach(k => { currentLayout[k].x += dx; currentLayout[k].y += dy; });
+    } else { currentLayout[dragItem].x += dx; currentLayout[dragItem].y += dy; }
+    updatePreview();
+};
+window.onmouseup = () => dragItem = null;
+
+canvas.onwheel = e => {
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (canvas.width / r.width) / MM_TO_PX;
+    const my = (e.clientY - r.top) * (canvas.height / r.height) / MM_TO_PX;
+    const scaleFactor = e.deltaY > 0 ? 0.95 : 1.05;
+    for (let key in currentLayout) {
+        let item = currentLayout[key];
+        if (mx >= item.x && mx <= item.x + 30 && my >= item.y && my <= item.y + 10) {
+            if (item.isTable) {
+                const px = currentLayout['h_date'].x; const py = currentLayout['h_date'].y;
+                TABLE_KEYS.forEach(k => {
+                    let f = currentLayout[k];
+                    f.x = px + (f.x - px) * scaleFactor; f.y = py + (f.y - py) * scaleFactor;
+                    f.size *= scaleFactor; f.baseSize *= scaleFactor;
+                });
+            } else { currentLayout[key].size *= scaleFactor; }
+            updatePreview(); break;
+        }
+    }
+};
+
+function processLogData() {
+    const start = document.getElementById("filterStart").value;
+    const end = document.getElementById("filterEnd").value;
+    
+    // Sett inn QSL-info for all QSOs dersom data er hentet inn
+    if (prefixData) {
+        allQSOs.forEach(q => {
+            q.prefix = extractPrefix(q.call);
+            const info = getCountryInfo(q.prefix);
+            q.bureauCountry = info ? info.country : null;
+            q.noBureau = info ? !info.info.hasQSLSortService : false;
+            q.unknownPrefix = !info;
+        });
+    }
+
+    filteredQSOs = allQSOs.filter(q => {
+        const dStr = q.qso_date.substring(0,4) + "-" + q.qso_date.substring(4,6) + "-" + q.qso_date.substring(6,8);
+        const dateMatch = (!start || dStr >= start) && (!end || dStr <= end);
+        const countryMatch = selectedCountries.length === 0 || selectedCountries.includes(q.country);
+        
+        let keep = dateMatch && countryMatch;
+
+        // QSL-BY-BUREAU Ekskluderings-regel
+        if (qslSyncActive && (q.noBureau || q.unknownPrefix)) {
+            keep = false;
+        }
+
+        return keep;
+    });
+
+    document.getElementById("countDisplay").innerText = selectedCountries.length === 0 ? "All" : selectedCountries.length;
+
+    // Sorteringslogikk
+    if (qslSyncActive) {
+        // Eksakt rutine fra QSL-BY-BUREAU
+        filteredQSOs.sort((a, b) => {
+            const ca = a.bureauCountry || 'ZZZ-UNKNOWN';
+            const cb = b.bureauCountry || 'ZZZ-UNKNOWN';
+            if (ca !== cb) return ca.localeCompare(cb);
+
+            if (a.prefix !== b.prefix) {
+                const ia = a.bureauCountry ? prefixData.countries[a.bureauCountry].prefixes.indexOf(a.prefix) : 9999;
+                const ib = b.bureauCountry ? prefixData.countries[b.bureauCountry].prefixes.indexOf(b.prefix) : 9999;
+                if (ia !== ib) return ia - ib;
+            }
+            return a.call.localeCompare(b.call);
+        });
+    } else if (document.getElementById("autoSort").checked) {
+        // Fallback ADIF Sortering
+        filteredQSOs.sort((a, b) => (a.country || "").localeCompare(b.country || "") || a.full_dt - b.full_dt);
+    } else {
+        // Kronologisk sortering
+        filteredQSOs.sort((a, b) => a.full_dt - b.full_dt);
+    }
+
+    if(filteredQSOs.length > 0) {
+        if (!filteredQSOs.includes(activeQSO)) activeQSO = filteredQSOs[0];
+    } else {
+        activeQSO = { call: "NO DATA", qso_date: "20260101", time_on: "0000", mode: "N/A", freq: "N/A", rst_sent: "N/A", country: "N/A", comment: "", full_dt: new Date() };
+    }
+
+    renderTable();
+    updatePreview();
+}
+
+document.getElementById("adifFile").onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const text = ev.target.result;
+        const countries = new Set();
+        // Split by <eor> and clean up
+        allQSOs = text.split(/<eor>/i).map(entry => {
+            const fields = {};
+            const regex = /<(\w+):?(\d+)?(?::\w)?>([^<]*)/gi;
+            let m;
+            while ((m = regex.exec(entry)) !== null) {
+                fields[m[1].toLowerCase()] = m[3].trim();
+            }
+            if(!fields.call) return null;
+            if(fields.country) countries.add(fields.country);
+            let d = fields.qso_date || "20260101";
+            let t = fields.time_on || "0000";
+            return {
+                call: fields.call.toUpperCase(), country: fields.country || "Unknown",
+                qso_date: d, time_on: t, mode: fields.mode || "SSB",
+                rst_sent: fields.rst_sent || "59", freq: fields.freq || fields.band || "",
+                comment: fields.comment || "",
+                full_dt: new Date(d.substring(0,4), d.substring(4,6)-1, d.substring(6,8), t.substring(0,2), t.substring(2,4))
+            };
+        }).filter(q => q !== null);
+
+        availableCountries = Array.from(countries).sort();
+        const grid = document.getElementById("countryGrid");
+        grid.innerHTML = availableCountries.map(c => `
+            <div class="country-btn" onclick="toggleCountry(this, '${c}')">${c}</div>
+        `).join("");
+
+        selectedCountries = [];
+        processLogData();
+    };
+    reader.readAsText(file);
+};
+
+function renderTable() {
+    const tbody = document.querySelector("#qsoTable tbody");
+    tbody.innerHTML = filteredQSOs.map((q, i) => {
+        let displayCountry = q.country;
+        // Endre display land i tabellen for å bekrefte hvilken byrå-sortering som gjelder
+        if (qslSyncActive && q.bureauCountry) {
+            displayCountry = q.bureauCountry;
+        }
+        return `<tr onclick="setActive(${i})" class="${activeQSO === q ? 'selected-row' : ''}">
+            <td>${i+1}</td><td>${formatDate(q.qso_date)} ${q.time_on}</td>
+            <td>${q.call}</td><td>${displayCountry}</td><td>${q.freq}</td><td>${q.mode}</td><td>${q.rst_sent}</td>
+        </tr>`;
+    }).join("");
+}
+
+function setActive(i) { activeQSO = filteredQSOs[i]; renderTable(); updatePreview(); }
+function formatDate(d) { return (d && d.length === 8) ? `${d.substring(6,8)}.${d.substring(4,6)}.${d.substring(0,4)}` : d; }
+document.getElementById("resetLayout").onclick = () => { currentLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT)); updatePreview(); };
+
+document.getElementById("generatePDF").onclick = async () => {
+    if (filteredQSOs.length === 0 || activeQSO.call === "NO DATA") return alert("No valid QSOs to generate.");
+    const { jsPDF } = window.jspdf;
+    const w = parseFloat(document.getElementById("labelWidth").value);
+    const h = parseFloat(document.getElementById("labelHeight").value);
+    const doc = new jsPDF({ orientation: w > h ? "l" : "p", unit: "mm", format: [w, h] });
+    for (let i = 0; i < filteredQSOs.length; i++) {
+        if (i > 0) doc.addPage([w, h]);
+        activeQSO = filteredQSOs[i];
+        updatePreview();
+        await new Promise(r => setTimeout(r, 60));
+        doc.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, 0, w, h);
+    }
+    doc.save(`QSL_Labels.pdf`);
+};
+
+window.onload = () => updatePreview();
+</script>
+</body>
+</html>
