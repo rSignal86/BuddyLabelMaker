@@ -6,7 +6,8 @@
 
 No installation.  
 No subscriptions.  
-No nonsense.  
+No nonsense.
+No MakeItShitty
 
 Just your ADIF file, a canvas, and pure, unadulterated label-making joy.
 
@@ -29,14 +30,14 @@ Cryptic enough? If you know, you know.
 You don't. That is the beauty of it.  
 Download `BuddyLabelMaker.html`. Double-click it. Boom. You are now a label-making logistics expert.  
 Works on Windows, Mac, Linux, or that old toaster running Netscape (if it supports HTML5 canvas).
-you can also run it on your webserver from 1995 if you want to i give a shit.
+you can also run it on your webserver from 1995 if you want as long it can handle HTML 5 and Canvas, i give a shit.
 
 ---
 
 ## Features
 
 - Parse ADIF files faster than you can say "CQ"
-- **QSL-BY-BUREAU Sync:** Automatically filters out non-bureau and unknown prefixes (Snitcher approves)
+- **QSL-BY-BUREAU Sync:** Automatically filters out non-bureau and unknown prefixes
 - Drag & Scale layout editor right inside your browser
 - Exports to a continuously paging PDF (perfect for your *Buddy* printer to snip-snip)
 - Dark mode aesthetics, because we are serious operators
@@ -48,10 +49,11 @@ you can also run it on your webserver from 1995 if you want to i give a shit.
 1. Open the HTML file.
 2. Upload your `.adi` log file.
 3. Drag the text around until it looks pretty.
-4. Hit **GENERATE PDF**.
-5. Send it to your male-sibling printer.
-6. Watch the automatic cutter go *snip, snip, snip*.
-7. Drink soda.
+4. you can scroll with the mouse over a text to make it bigger or smaler
+5. Hit **GENERATE PDF**.
+6. Send it to your male-sibling printer.
+7. Watch the automatic cutter go *snip, snip, snip*.
+8. Drink soda.
 
 ---
 
