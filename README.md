@@ -67,6 +67,6 @@ Fork it, change it, print the source code and eat it. I honestly don't care. It'
 ## dontBuyMeACoffee
 
 Seriously, don't buy me a coffee. I don't want your money.  
-If you feel an overwhelming urge to spend money because this tool saved your sanity, go buy yourself a soda. Or buy more label rolls for your "Buddy". 
+If you feel an overwhelming urge to spend money because this tool saved your sanity, go buy yourself a sugar free soda. Or buy more label rolls for your "Buddy". 
 
 73 de LB6QJ
